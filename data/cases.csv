@@ -1,0 +1,340 @@
+case_id,symptom,topology_note,show_outputs,expected_fault,osi_layer,concept_tag,severity,case_type
+1,PC1 (VLAN 10) gets IP 192.168.10.50 but cannot ping PC2 (VLAN 20: 192.168.20.50),"Packet Tracer Lab: Router R1-EDGE (Cisco 2911) connected via Gi0/0 trunk to Switch SW-CORE (2960). PC1 on SW-CORE Fa0/1 (VLAN 10), PC2 on SW-CORE Fa0/2 (VLAN 20).","Device: R1-EDGE
+hostname R1-EDGE
+!
+interface GigabitEthernet0/0
+ no ip address
+ duplex auto
+ speed auto
+!
+interface GigabitEthernet0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.10.1 255.255.255.0
+!
+interface GigabitEthernet0/0.20
+ encapsulation dot1Q 20
+ shutdown
+ ip address 192.168.20.1 255.255.255.0
+!
+show ip route
+C    192.168.10.0/24 is directly connected, GigabitEthernet0/0.10
+
+Device: SW-CORE
+hostname SW-CORE
+!
+vlan 10
+ name Sales
+vlan 20
+ name Engineering
+!
+interface FastEthernet0/1
+ switchport access vlan 10
+ switchport mode access
+!
+interface FastEthernet0/2
+ switchport access vlan 20
+ switchport mode access
+!
+interface GigabitEthernet0/1
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20
+",Router subinterface GigabitEthernet0/0.20 is administratively down,3,inter-vlan-routing,high,routing
+2,Guest Wi-Fi clients (VLAN 50: 10.0.50.0/24) get IP but cannot reach File Server (VLAN 100: 10.0.100.50),Packet Tracer Lab: Router R1-GW handling inter-VLAN routing with ACL 101 applied. SW-ACCESS hosting VLAN 50 (Guest) and VLAN 100 (Server).,"Device: R1-GW
+hostname R1-GW
+!
+interface GigabitEthernet0/0.50
+ encapsulation dot1Q 50
+ ip address 10.0.50.1 255.255.255.0
+ ip access-group 101 in
+!
+interface GigabitEthernet0/0.100
+ encapsulation dot1Q 100
+ ip address 10.0.100.1 255.255.255.0
+!
+access-list 101 deny ip 10.0.50.0 0.0.0.255 10.0.100.0 0.0.0.255
+access-list 101 permit ip any any
+
+Device: SW-ACCESS
+hostname SW-ACCESS
+!
+vlan 50
+ name Guest
+vlan 100
+ name Server
+!
+interface GigabitEthernet0/1
+ switchport mode trunk
+ switchport trunk allowed vlan 50,100
+",VLAN ACL 101 explicitly denies traffic from VLAN 50 (10.0.50.0/24) to VLAN 100 (10.0.100.0/24),3-4,vlan-acl,high,acl
+3,Workstation PC-01 reports IP address conflict warning for 192.168.1.50,Packet Tracer Lab: Router R1-DHCP configured as DHCP server. Network printer static IP 192.168.1.50 in same subnet.,"Device: R1-DHCP
+hostname R1-DHCP
+!
+ip dhcp pool LAN_POOL
+ network 192.168.1.0 255.255.255.0
+ default-router 192.168.1.1
+!
+show ip dhcp binding
+IP address       Client-ID/Hardware address     Lease expiration        Type
+192.168.1.50     0060.2F3A.1122                 Aug 19 2026 05:00 PM    Automatic
+!
+show ip dhcp conflict
+IP address       Detection method   Detection time
+192.168.1.50     Ping               Aug 19 2026 04:30 PM
+",DHCP pool 192.168.1.0/24 missing ip dhcp excluded-address range for static IP 192.168.1.50,3,ip-conflict,critical,dhcp
+4,OSPF neighbors R1-CORE and R2-BRANCH stuck in INIT state; no dynamic routes in routing table,Packet Tracer Lab: R1-CORE and R2-BRANCH connected via Serial link S0/0/0. Both running OSPF Process 1.,"Device: R1-CORE
+hostname R1-CORE
+!
+interface Serial0/0/0
+ ip address 10.1.1.1 255.255.255.252
+!
+router ospf 1
+ router-id 1.1.1.1
+ network 10.1.1.0 0.0.0.3 area 0
+!
+show ip ospf neighbor
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+2.2.2.2           0   INIT/  -        00:00:33    10.1.1.2        Serial0/0/0
+
+Device: R2-BRANCH
+hostname R2-BRANCH
+!
+interface Serial0/0/0
+ ip address 10.1.1.2 255.255.255.252
+!
+router ospf 1
+ router-id 2.2.2.2
+ network 10.1.1.0 0.0.0.3 area 1
+!
+show ip ospf neighbor
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1           0   INIT/  -        00:00:31    10.1.1.1        Serial0/0/0
+",OSPF Area ID mismatch: R1-CORE interface in Area 0 while R2-BRANCH interface in Area 1,3,ospf-area-mismatch,high,routing
+5,Switches SW-FLOOR1 and SW-FLOOR2 trunk link port flapping with native VLAN mismatch error in Syslog,Packet Tracer Lab: SW-FLOOR1 connected to SW-FLOOR2 on GigabitEthernet0/1 configured as 802.1Q trunk.,"Device: SW-FLOOR1
+hostname SW-FLOOR1
+!
+interface GigabitEthernet0/1
+ switchport mode trunk
+ switchport trunk native vlan 10
+!
+%CDP-4-NATIVE_VLAN_MISMATCH: Native VLAN mismatch detected on GigabitEthernet0/1 (10), with SW-FLOOR2 GigabitEthernet0/1 (20).
+
+Device: SW-FLOOR2
+hostname SW-FLOOR2
+!
+interface GigabitEthernet0/1
+ switchport mode trunk
+ switchport trunk native vlan 20
+","Native VLAN mismatch on trunk link: SW-FLOOR1 uses Native VLAN 10, SW-FLOOR2 uses Native VLAN 20",2,trunk-native-vlan-mismatch,high,layer2
+6,PC1 in VLAN 30 fails to get IP address from central DHCP server (10.100.1.50),Packet Tracer Lab: Router R1-HQ acts as default gateway for VLAN 30 (192.168.30.0/24). Central DHCP server located on VLAN 100.,"Device: R1-HQ
+hostname R1-HQ
+!
+interface GigabitEthernet0/0.30
+ encapsulation dot1Q 30
+ ip address 192.168.30.1 255.255.255.0
+!
+interface GigabitEthernet0/0.100
+ encapsulation dot1Q 100
+ ip address 10.100.1.1 255.255.255.0
+!
+Device: SW1
+hostname SW1
+!
+interface FastEthernet0/10
+ switchport access vlan 30
+ switchport mode access
+",Missing ip helper-address 10.100.1.50 command on router subinterface GigabitEthernet0/0.30,3,dhcp-relay-missing,high,dhcp
+7,R1-HQ cannot reach Branch LAN (172.16.10.0/24); ping to 172.16.10.1 times out,"Packet Tracer Lab: R1-HQ connected to R2-BR via point-to-point link 10.0.0.0/30 (R1: 10.0.0.1, R2: 10.0.0.2).","Device: R1-HQ
+hostname R1-HQ
+!
+interface GigabitEthernet0/0
+ ip address 10.0.0.1 255.255.255.252
+!
+ip route 172.16.10.0 255.255.255.0 10.0.0.5
+!
+show ip route
+S    172.16.10.0/24 [1/0] via 10.0.0.5 (unreachable)
+
+Device: R2-BR
+hostname R2-BR
+!
+interface GigabitEthernet0/0
+ ip address 10.0.0.2 255.255.255.252
+",Static route on R1-HQ points to invalid next-hop IP 10.0.0.5 instead of 10.0.0.2,3,static-route-invalid-nexthop,high,routing
+8,Switchport Fa0/5 becomes disabled immediately when employee connects new laptop,"Packet Tracer Lab: Switch SW-SEC configured with Port Security on Fa0/5 (max 1 MAC, violation shutdown).","Device: SW-SEC
+hostname SW-SEC
+!
+interface FastEthernet0/5
+ switchport mode access
+ switchport port-security
+ switchport port-security maximum 1
+ switchport port-security mac-address 0010.1122.3344
+ switchport port-security violation shutdown
+!
+show interfaces FastEthernet0/5
+FastEthernet0/5 is down, line protocol is down (err-disabled)
+!
+show port-security interface FastEthernet0/5
+Port Security              : Enabled
+Port Status                : Secure-shutdown
+Violation Mode             : Shutdown
+Security Violation Count   : 1
+Last Source Address:Vlan   : 0090.AABB.CCDD:1
+",Port Security violation triggered by unauthorized MAC address 0090.AABB.CCDD on Fa0/5,2,port-security-errdisable,high,layer2
+9,Internal LAN (192.168.1.0/24) hosts cannot access Internet web server (8.8.8.8),Packet Tracer Lab: Router R1-NAT running Dynamic NAT overload (PAT) towards ISP router.,"Device: R1-NAT
+hostname R1-NAT
+!
+interface GigabitEthernet0/0
+ ip address 192.168.1.1 255.255.255.0
+!
+interface GigabitEthernet0/1
+ ip address 203.0.113.2 255.255.255.252
+ ip nat outside
+!
+ip nat inside source list 1 interface GigabitEthernet0/1 overload
+access-list 1 permit 192.168.1.0 0.0.0.255
+!
+show ip nat translations
+(empty)
+",Internal interface GigabitEthernet0/0 is missing the ip nat inside command,3,nat-inside-missing,high,nat
+10,EIGRP neighbors R1 and R2 do not form adjacency; routing tables missing remote subnets,"Packet Tracer Lab: R1 and R2 connected via serial link S0/0/0. R1 in EIGRP AS 100, R2 in EIGRP AS 200.","Device: R1
+hostname R1
+!
+interface Serial0/0/0
+ ip address 10.2.2.1 255.255.255.252
+!
+router eigrp 100
+ network 10.2.2.0 0.0.0.3
+!
+show ip eigrp neighbors
+IP-EIGRP neighbors for process 100
+(empty)
+
+Device: R2
+hostname R2
+!
+interface Serial0/0/0
+ ip address 10.2.2.2 255.255.255.252
+!
+router eigrp 200
+ network 10.2.2.0 0.0.0.3
+!
+show ip eigrp neighbors
+IP-EIGRP neighbors for process 200
+(empty)
+",EIGRP Autonomous System (AS) number mismatch: R1 uses AS 100 while R2 uses AS 200,3,eigrp-as-mismatch,high,routing
+11,Duplicate IP address warnings for 192.168.1.254 on default gateway; network instability,Packet Tracer Lab: R1 (Priority 110) and R2 (Priority 100) configured for HSRP Group 1 on Gi0/0.,"Device: R1
+hostname R1
+!
+interface GigabitEthernet0/0
+ ip address 192.168.1.2 255.255.255.0
+ standby 1 ip 192.168.1.254
+ standby 1 priority 110
+!
+show standby brief
+Group  State   Active          Standby         Virtual IP
+1      Active  local           192.168.1.3     192.168.1.254
+
+Device: R2
+hostname R2
+!
+interface GigabitEthernet0/0
+ ip address 192.168.1.3 255.255.255.0
+ standby 1 ip 192.168.1.254
+ standby 1 priority 100
+ ip access-group 105 in
+!
+access-list 105 deny udp any any eq 1985
+access-list 105 permit ip any any
+!
+show standby brief
+Group  State   Active          Standby         Virtual IP
+1      Active  local           unknown         192.168.1.254
+",HSRP dual-active split brain caused by ACL 105 on R2 blocking HSRP UDP 1985 hello packets,3,hsrp-split-brain,critical,redundancy
+12,EtherChannel Port-channel 1 down; member interfaces Gi0/1 and Gi0/2 remain in suspended mode,Packet Tracer Lab: SW1 and SW2 interconnected via two links configured for LACP EtherChannel.,"Device: SW1
+hostname SW1
+!
+interface GigabitEthernet0/1
+ channel-group 1 mode passive
+!
+interface GigabitEthernet0/2
+ channel-group 1 mode passive
+!
+show etherchannel summary
+Group  Port-channel  Protocol    Ports
+1      Po1(SD)         LACP      Gi0/1(I) Gi0/2(I)
+
+Device: SW2
+hostname SW2
+!
+interface GigabitEthernet0/1
+ channel-group 1 mode passive
+!
+interface GigabitEthernet0/2
+ channel-group 1 mode passive
+!
+show etherchannel summary
+Group  Port-channel  Protocol    Ports
+1      Po1(SD)         LACP      Gi0/1(I) Gi0/2(I)
+",LACP EtherChannel mode passive on both switches prevents channel negotiation (at least one must be active),2,lacp-etherchannel-passive,high,layer2
+13,Lightweight APs in VLAN 20 fail to discover Wireless LAN Controller (10.100.1.10) in VLAN 100,Packet Tracer Lab: Cisco 3702 AP in VLAN 20 receiving DHCP from Router R1-DHCP.,"Device: R1-DHCP
+hostname R1-DHCP
+!
+ip dhcp pool AP_POOL
+ network 192.168.20.0 255.255.255.0
+ default-router 192.168.20.1
+!
+Device: WLC-3504
+hostname WLC-3504
+!
+Management Interface IP: 10.100.1.10
+AP Summary: 0 APs connected
+",DHCP pool AP_POOL missing Option 43 (ip dhcp pool AP_POOL -> option 43 ip 10.100.1.10) for CAPWAP WLC discovery,3,wlc-capwap-dhcp-option43,high,wireless
+14,eBGP session between Router R1-ENT and ISP-RTR fails to establish; state remains Idle,Packet Tracer Lab: Enterprise Router R1-ENT (AS 65001) peering with ISP Router (AS 64512) over 203.0.113.0/30.,"Device: R1-ENT
+hostname R1-ENT
+!
+interface GigabitEthernet0/0
+ ip address 203.0.113.1 255.255.255.252
+!
+router bgp 65001
+ neighbor 203.0.113.2 remote-as 64599
+!
+show ip bgp summary
+BGP neighbor is 203.0.113.2, remote AS 64599, external link
+BGP state = Idle
+
+Device: ISP-RTR
+hostname ISP-RTR
+!
+interface GigabitEthernet0/0
+ ip address 203.0.113.2 255.255.255.252
+!
+router bgp 64512
+ neighbor 203.0.113.1 remote-as 65001
+",BGP neighbor remote-as mismatch on R1-ENT: configured remote-as 64599 instead of ISP AS 64512,3,bgp-remote-as-mismatch,high,routing
+15,Broadcast storm and MAC address table instability occurring across Switch SW1 and SW2,Packet Tracer Lab: Inter-switch trunk link Gi0/1 configured with PortFast by mistake.,"Device: SW1
+hostname SW1
+!
+interface GigabitEthernet0/1
+ switchport mode trunk
+ spanning-tree portfast
+!
+show spanning-tree interface GigabitEthernet0/1
+PortFast enabled on trunk port GigabitEthernet0/1!
+Topology change counter: 452
+",Spanning Tree PortFast enabled on trunk interface GigabitEthernet0/1 bypassing listening/learning states,2,stp-portfast-trunk-loop,critical,layer2
+16,Branch router cannot form eBGP peering with ISP router,Packet Tracer Lab: R-BRANCH connected to R-ISP via Gi0/0. AS numbers differ.,Device: R-BRANCH\nhostname R-BRANCH\n!\nrouter bgp 65001\n neighbor 203.0.113.2 remote-as 65001\n!\n---,eBGP remote-as mismatch,3,routing,high
+17,Wireless clients cannot connect to AP; authentication fails,Packet Tracer Lab: WLC managing AP. Clients use 802.1x RADIUS.,Device: WLC\nhostname WLC\n!\nradius-server host 10.10.10.5 auth-port 1812 acct-port 1813 key wrong_secret\n!\n---,RADIUS shared secret mismatch,7,wireless,high
+18,Internal web server inaccessible from Internet via Public IP,Packet Tracer Lab: EDGE router doing Static NAT for web server 10.0.0.80.,Device: EDGE\nhostname EDGE\n!\nip nat inside source static tcp 10.0.0.80 80 203.0.113.10 8080\n!\n---,NAT port translation mapped to 8080 instead of 80,3-4,nat,high
+19,PC receives IP from DHCP but cannot browse websites by name,Packet Tracer Lab: R-DHCP serving clients. No DNS server configured.,Device: R-DHCP\nhostname R-DHCP\n!\nip dhcp pool USERS\n network 192.168.1.0 255.255.255.0\n default-router 192.168.1.1\n!\n---,DHCP pool missing dns-server option,7,"dhcp,dns",medium
+20,Spanning Tree loop crashing the network; high CPU on switches,"Packet Tracer Lab: Core switch and Distribution switch connected with redundant links, BPDU guard disabled.",Device: Core-SW\nhostname Core-SW\n!\ninterface range fa0/1 - 2\n spanning-tree bpdufilter enable\n!\n---,BPDU filter causing STP loop,2,stp,high
+21,IPv6 clients cannot ping each other on same link,Packet Tracer Lab: SW1 connecting IPv6 clients.,Device: SW1\nhostname SW1\n!\nipv6 nd suppress-ra all\n!\n---,IPv6 Router Advertisements suppressed,3,ipv6,medium
+22,EtherChannel between Core and Access switch not forming,Packet Tracer Lab: SW-CORE and SW-ACCESS connected via Gi0/1 and Gi0/2.,Device: SW-CORE\nhostname SW-CORE\n!\ninterface range Gi0/1 - 2\n channel-group 1 mode on\n!\n---\nDevice: SW-ACCESS\nhostname SW-ACCESS\n!\ninterface range Gi0/1 - 2\n channel-group 1 mode active\n!\n---,LACP mode mismatch (on vs active),2,etherchannel,high
+23,HSRP standby router stays in INIT state,Packet Tracer Lab: R1 and R2 running HSRP for VLAN 10.,Device: R1\nhostname R1\n!\ninterface Vlan 10\n standby 1 ip 10.1.1.254\n!\n---\nDevice: R2\nhostname R2\n!\ninterface Vlan 10\n standby 2 ip 10.1.1.254\n!\n---,HSRP group number mismatch (1 vs 2),3,hsrp,high
+24,SSH access to router fails; Telnet works,Packet Tracer Lab: R-CORE admin access.,Device: R-CORE\nhostname R-CORE\n!\nline vty 0 4\n transport input telnet\n!\n---,transport input ssh missing,7,security,medium
+25,NTP clock completely unsynced,Packet Tracer Lab: R1 trying to sync to 10.1.1.1.,Device: R1\nhostname R1\n!\nntp server 10.1.1.2\n!\n---,NTP server IP typo,7,ntp,low
+26,"Inter-VLAN routing works, but internet access fails",Packet Tracer Lab: Edge router missing default route to ISP.,Device: Edge\nhostname Edge\n!\nshow ip route\nC 10.0.0.0/8 is directly connected\n!\n---,Missing default route 0.0.0.0 0.0.0.0,3,routing,high
+27,Port security disabling port when PC is plugged in,Packet Tracer Lab: SW-Access with port security.,Device: SW-Access\nhostname SW-Access\n!\ninterface Fa0/1\n switchport port-security mac-address 0000.1111.2222\n!\n---,Hardcoded MAC address mismatch,2,port-security,medium
+28,Site-to-Site IPsec VPN failing to establish phase 1,Packet Tracer Lab: R-SITE1 and R-SITE2.,Device: R-SITE1\nhostname R-SITE1\n!\ncrypto isakmp key secret123 address 1.1.1.2\n!\n---\nDevice: R-SITE2\nhostname R-SITE2\n!\ncrypto isakmp key wrongsecret address 1.1.1.1\n!\n---,ISAKMP pre-shared key mismatch,3,vpn,high
+29,VLAN 30 PCs cannot get DHCP IP from central server,"Packet Tracer Lab: R1 handling routing, DHCP on Server.",Device: R1\nhostname R1\n!\ninterface Gi0/0.30\n encapsulation dot1Q 30\n ip address 10.0.30.1 255.255.255.0\n!\n---,Missing ip helper-address on subinterface,3,dhcp,high
+30,EIGRP neighbor adjacency flapping,Packet Tracer Lab: R1 and R2 EIGRP AS 100.,Device: R1\nhostname R1\n!\ninterface Gi0/0\n ip hello-interval eigrp 100 5\n ip hold-time eigrp 100 15\n!\n---\nDevice: R2\nhostname R2\n!\ninterface Gi0/0\n ip hello-interval eigrp 100 10\n ip hold-time eigrp 100 30\n!\n---,EIGRP hello/hold timer mismatch,3,routing,medium
+31,Users have lost ALL access to the internal Web Application (HTTP/HTTPS).,Enterprise Network. CORE-SW handles routing. FW-EDGE handles security. APP-SERVER is at 10.100.1.50.,Device: CORE-SW\nhostname CORE-SW\n!\ninterface Vlan10\n ip address 10.10.10.1 255.255.255.0\n!\ninterface Vlan100\n ip address 10.100.1.1 255.255.255.0\n!\n! FAULT 1: Missing routing to the App Server VLAN!\nno ip routing\n!\n---\nDevice: FW-EDGE\nhostname FW-EDGE\n!\ninterface GigabitEthernet0/0\n ip access-group 101 in\n!\n! FAULT 2: ACL is actively denying all HTTP/HTTPS traffic to the App Server!\naccess-list 101 deny tcp any host 10.100.1.50 eq 80\naccess-list 101 deny tcp any host 10.100.1.50 eq 443\naccess-list 101 permit ip any any\n!\n---,Multiple faults: CORE-SW has IP routing disabled. FW-EDGE has an ACL blocking port 80/443 to the app server.,3-4,"routing,acl,app-access",high

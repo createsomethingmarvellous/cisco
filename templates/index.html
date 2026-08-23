@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetSage AI Chat</title>
+    <style>
+        :root {
+            --bg-color: #212121;
+            --chat-bg: #212121;
+            --input-bg: #2f2f2f;
+            --text-color: #ececec;
+            --user-bubble: #2f2f2f;
+            --ai-bubble: transparent;
+            --accent: #10a37f;
+            --border: #4a4a4a;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        header h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .dashboard-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .stat-item span {
+            color: var(--text-color);
+            font-weight: bold;
+        }
+
+        /* Chat Area */
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            display: flex;
+            gap: 15px;
+            padding: 10px;
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .user-avatar { background: #5436DA; color: white; }
+        .ai-avatar { background: var(--accent); color: white; }
+
+        .message-content {
+            flex: 1;
+            line-height: 1.6;
+        }
+
+        .message.user-message .message-content {
+            background: var(--user-bubble);
+            padding: 10px 15px;
+            border-radius: 12px;
+            border-top-left-radius: 0;
+            display: inline-block;
+            max-width: 100%;
+            white-space: pre-wrap;
+        }
+
+        /* AI Elements */
+        .cmd-request {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .cmd-request .device-badge {
+            background: #444;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 8px;
+            display: inline-block;
+            color: #ddd;
+        }
+
+        .cmd-request code {
+            display: block;
+            color: #569cd6;
+            font-family: monospace;
+            background: black;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+
+        .fault-card {
+            background: rgba(16, 163, 127, 0.1);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        /* Input Area */
+        #input-container {
+            padding: 20px;
+            background: var(--bg-color);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: center;
+        }
+
+        .input-box {
+            max-width: 900px;
+            width: 100%;
+            display: flex;
+            background: var(--input-bg);
+            border-radius: 16px;
+            padding: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            align-items: flex-end;
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-color);
+            resize: none;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 15px;
+            max-height: 200px;
+            outline: none;
+        }
+
+        button.send-btn {
+            background: var(--text-color);
+            color: var(--bg-color);
+            border: none;
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 4px;
+            margin-right: 4px;
+            transition: 0.2s;
+        }
+        button.send-btn:hover {
+            background: white;
+        }
+        button.send-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            color: #aaa;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>NetSage AI Assistant</h2>
+        <div class="dashboard-stats" id="stats-panel">
+            <div class="stat-item">Reviews: <span id="stat-total">0</span></div>
+            <div class="stat-item">Accepted: <span id="stat-acc" style="color:var(--accent);">0%</span></div>
+        </div>
+    </header>
+
+    <div id="chat-container">
+        <!-- Initial greeting -->
+        <div class="message ai-message">
+            <div class="avatar ai-avatar">AI</div>
+            <div class="message-content">
+                Hello! I am NetSage AI, your conversational network troubleshooting assistant.<br><br>
+                Please describe the symptom (e.g. "Clients can't reach the internet") and paste any relevant `show running-config` or routing table snippets you have. I will analyze them and let you know if I need more specific outputs!
+            </div>
+        </div>
+    </div>
+
+    <div id="input-container">
+        <div class="input-box">
+            <textarea id="chat-input" rows="1" placeholder="Describe issue and paste logs here..." oninput="autoGrow(this)"></textarea>
+            <button class="send-btn" id="send-btn" onclick="sendMessage()">âž¤</button>
+        </div>
+    </div>
+
+    <script>
+        let chatHistory = [];
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                document.getElementById('stat-total').innerText = data.total_reviews;
+                const t = data.total_reviews || 1;
+                document.getElementById('stat-acc').innerText = ((data.decisions.ACCEPTED / t) * 100).toFixed(0) + "%";
+            } catch (e) {
+                console.error("Stats error", e);
+            }
+        }
+        fetchStats();
+
+        function autoGrow(element) {
+            element.style.height = "5px";
+            element.style.height = (element.scrollHeight)+"px";
+            if (element.scrollHeight > 200) {
+                element.style.overflowY = "auto";
+            } else {
+                element.style.overflowY = "hidden";
+            }
+        }
+
+        function addMessage(role, contentHtml, isRawText = false) {
+            const chat = document.getElementById('chat-container');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message ' + (role === 'user' ? 'user-message' : 'ai-message');
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar ' + (role === 'user' ? 'user-avatar' : 'ai-avatar');
+            avatar.innerText = role === 'user' ? 'U' : 'AI';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (isRawText) {
+                contentDiv.innerText = contentHtml;
+            } else {
+                contentDiv.innerHTML = contentHtml;
+            }
+
+            msgDiv.appendChild(avatar);
+            msgDiv.appendChild(contentDiv);
+            chat.appendChild(msgDiv);
+            
+            // Scroll to bottom
+            setTimeout(() => chat.scrollTop = chat.scrollHeight, 50);
+        }
+
+        async function sendMessage() {
+            const inputEl = document.getElementById('chat-input');
+            const text = inputEl.value.trim();
+            if (!text) return;
+
+            // 1. Add User Message to UI
+            addMessage('user', text, true);
+            chatHistory.push({ role: 'user', content: text });
+            
+            inputEl.value = '';
+            autoGrow(inputEl);
+            document.getElementById('send-btn').disabled = true;
+
+            // 2. Add Loading Indicator
+            const chat = document.getElementById('chat-container');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message ai-message loading-msg';
+            loadingDiv.innerHTML = `<div class="avatar ai-avatar">AI</div><div class="message-content loading">Analyzing network state...</div>`;
+            chat.appendChild(loadingDiv);
+            chat.scrollTop = chat.scrollHeight;
+
+            try {
+                // 3. Send to Backend
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: chatHistory })
+                });
+
+                const data = await response.json();
+                chat.removeChild(loadingDiv);
+                document.getElementById('send-btn').disabled = false;
+
+                if (data.error) {
+                    addMessage('ai', `<span style="color:#ff6b6b">Error: ${data.error}</span>`);
+                    return;
+                }
+
+                const ai = data.ai_diagnosis;
+                let replyHtml = `<div>${ai.assistant_message || ''}</div>`;
+                
+                // Construct stringified version for chat memory
+                let memoryString = ai.assistant_message + "\n";
+
+                if (ai.status === 'needs_info') {
+                    if (ai.hypothesis_confidence) {
+                        replyHtml += `<div style="margin-top: 10px; font-size: 12px; color: #888;">Working Theory Confidence: <span style="color:var(--accent)">${ai.hypothesis_confidence.toUpperCase()}</span></div>`;
+                    }
+                    if (ai.actionable_requests) {
+                        ai.actionable_requests.forEach(req => {
+                            replyHtml += `
+                            <div class="cmd-request">
+                                <div class="device-badge">Device: ${req.device}</div>
+                                <div><em>Reason: ${req.reason}</em></div>
+                                <code>${req.command}</code>
+                            </div>`;
+                            memoryString += `\nRequested ${req.command} on ${req.device}`;
+                        });
+                    }
+                } else if (ai.status === 'solution' && ai.faults) {
+                    ai.faults.forEach((fault, idx) => {
+                        let stepsHtml = '';
+                        if (Array.isArray(fault.fix_steps) && fault.fix_steps.length > 0 && typeof fault.fix_steps[0] === 'object') {
+                            fault.fix_steps.forEach(step => {
+                                stepsHtml += `<div style="margin-bottom: 10px;">
+                                    <strong>${step.device}:</strong> ${step.explanation}
+                                    <pre style="background: black; padding: 10px; border-radius: 4px; color: #569cd6; font-family: monospace; white-space: pre-wrap; margin-top: 5px;">${step.commands.join('\n')}</pre>
+                                </div>`;
+                            });
+                        } else {
+                            stepsHtml = `<ul>${fault.fix_steps.map(step => `<li>${step}</li>`).join('')}</ul>`;
+                        }
+                        
+                        replyHtml += `
+                        <div class="fault-card">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3 style="margin:0; color:var(--accent)">Root Cause (Layer ${fault.osi_layer})</h3>
+                                <span style="background: #2f2f2f; padding: 2px 8px; border-radius: 12px; font-size: 11px;">Confidence: ${fault.confidence || 'N/A'}</span>
+                            </div>
+                            <p>${fault.root_cause}</p>
+                            <h4>Fix Steps:</h4>
+                            ${stepsHtml}
+                        </div>`;
+                        memoryString += `\nFound Solution: ${fault.root_cause}`;
+                    });
+                    
+                    if (ai.confidence_matrix) {
+                        replyHtml += `
+                        <div style="margin-top:15px; font-size: 12px; color: #aaa; background: #2f2f2f; padding: 10px; border-radius: 6px;">
+                            <strong>Multi-Layer Confidence Matrix:</strong><br>
+                            Layer 2: ${ai.confidence_matrix.layer_2 || 'N/A'} | Layer 3: ${ai.confidence_matrix.layer_3 || 'N/A'} | Layer 4-7: ${ai.confidence_matrix.layer_4_to_7 || 'N/A'}
+                        </div>`;
+                    }
+                    
+                    // Add Review Buttons
+                    replyHtml += `
+                        <div style="margin-top: 15px; display: flex; gap: 10px;">
+                            <button onclick="submitReview('ACCEPTED')" style="background:var(--accent); color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">Accept Fix</button>
+                            <button onclick="submitReview('REJECTED')" style="background:#ff4d4f; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">Reject Fix</button>
+                        </div>
+                    `;
+                }
+
+                addMessage('ai', replyHtml);
+                chatHistory.push({ role: 'assistant', content: memoryString });
+
+            } catch (error) {
+                chat.removeChild(loadingDiv);
+                document.getElementById('send-btn').disabled = false;
+                addMessage('ai', `<span style="color:#ff6b6b">Network Error: ${error.message}</span>`);
+            }
+        }
+
+        async function submitReview(decision) {
+            const lastAiMessage = chatHistory[chatHistory.length - 1];
+            await fetch('/api/review', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision: decision, ai_diagnosis: { root_cause: lastAiMessage.content } })
+            });
+            fetchStats();
+            alert(`Review submitted: ${decision}. Thanks for helping improve the model!`);
+        }
+        
+        // Handle Enter to send (Shift+Enter for newline)
+        document.getElementById('chat-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
