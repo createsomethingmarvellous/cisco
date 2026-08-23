@@ -18,7 +18,16 @@ from typing import Dict, Any, Optional
 class LLMEngine:
     """Executes real LLM inference for network troubleshooting prompts."""
 
-    DEFAULT_OPENROUTER_KEY = "your_gemini_api_key_here"
+    # Load .env file manually if python-dotenv is not installed
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                if line.strip() and not line.startswith('#'):
+                    k, v = line.strip().split('=', 1)
+                    os.environ[k] = v
+
+    DEFAULT_OPENROUTER_KEY = ""
 
     @classmethod
     def generate_diagnosis(cls, prompt_text: str, api_key: Optional[str] = None, provider: str = "gemini") -> Dict[str, Any]:
