@@ -18,14 +18,14 @@ from typing import Dict, Any, Optional
 class LLMEngine:
     """Executes real LLM inference for network troubleshooting prompts."""
 
-    DEFAULT_OPENROUTER_KEY = "your_openrouter_api_key_here"
+    DEFAULT_OPENROUTER_KEY = "your_gemini_api_key_here"
 
     @classmethod
-    def generate_diagnosis(cls, prompt_text: str, api_key: Optional[str] = None, provider: str = "openrouter") -> Dict[str, Any]:
+    def generate_diagnosis(cls, prompt_text: str, api_key: Optional[str] = None, provider: str = "gemini") -> Dict[str, Any]:
         """Generate diagnosis via Live LLM API or Generative Reasoning Engine."""
         
         # Check for user-provided API key or environment keys
-        api_key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENAI_API_KEY") or cls.DEFAULT_OPENROUTER_KEY
+        api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY") or cls.DEFAULT_OPENROUTER_KEY
 
         if api_key:
             try:
@@ -87,7 +87,7 @@ class LLMEngine:
 
     @classmethod
     def _call_gemini_api(cls, prompt_text: str, api_key: str) -> Dict[str, Any]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
         payload = {
             "contents": [{"parts": [{"text": prompt_text}]}],
             "generationConfig": {"response_mime_type": "application/json"}
