@@ -64,21 +64,54 @@ def review():
 @app.route('/api/stats', methods=['GET'])
 def stats():
     log_file = os.path.join(os.path.dirname(__file__), 'logs', 'responsible_ai_log.csv')
+    cases_file = os.path.join(os.path.dirname(__file__), 'data', 'cases.csv')
+
     logs = []
     if os.path.exists(log_file):
         with open(log_file, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             logs = list(reader)
-            
+
     decisions = {'ACCEPTED': 0, 'EDITED': 0, 'REJECTED': 0}
     for l in logs:
         d = l.get('human_decision', '')
         if d in decisions:
             decisions[d] += 1
-            
+
+    # Build theme counts from cases.csv
+    theme_counts = {}
+    if os.path.exists(cases_file):
+        with open(cases_file, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                tag = row.get('concept_tag', 'unknown').strip()
+                theme_counts[tag] = theme_counts.get(tag, 0) + 1
+
+    # Build per-theme agreement from log (ACCEPTED = agreement)
+    theme_agreement = {}
+    theme_total = {}
+    for l in logs:
+        tag = l.get('concept_tag', 'unknown').strip() or 'unknown'
+        d = l.get('human_decision', '')
+        theme_total[tag] = theme_total.get(tag, 0) + 1
+        if d == 'ACCEPTED':
+            theme_agreement[tag] = theme_agreement.get(tag, 0) + 1
+
+    agreement_rate = {}
+    for tag in theme_counts:
+        total = theme_total.get(tag, 0)
+        agreed = theme_agreement.get(tag, 0)
+        agreement_rate[tag] = round((agreed / total * 100), 1) if total > 0 else None
+
+    total = decisions.get('ACCEPTED', 0) + decisions.get('EDITED', 0) + decisions.get('REJECTED', 0)
+    overall_agreement = round(decisions['ACCEPTED'] / total * 100, 1) if total > 0 else 0
+
     return jsonify({
         'total_reviews': len(logs),
-        'decisions': decisions
+        'decisions': decisions,
+        'overall_agreement': overall_agreement,
+        'theme_counts': theme_counts,
+        'agreement_rate': agreement_rate
     })
 
 if __name__ == '__main__':
